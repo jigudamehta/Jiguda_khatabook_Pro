@@ -1,6 +1,6 @@
 // Service worker: caches the app files so the app opens offline.
 // IMPORTANT: when you edit any app file, change CACHE_VERSION so phones pick up the new files.
-const CACHE_VERSION = 'rms-ledger-v2';
+const CACHE_VERSION = 'rms-ledger-v3';
 const SHELL = [
   './', './index.html', './styles.css', './config.js', './core.js', './forms.js', './pages.js', './customer.js',
   './manifest.json', './icon.svg', './icon-192.png', './icon-512.png'
@@ -23,13 +23,13 @@ self.addEventListener('fetch', function (e) {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== location.origin) return; // API / Drive / fonts go straight to the network
+  // network first (so updates show on the first open), cache as the offline fallback
   e.respondWith(
-    caches.match(req, { ignoreSearch: true }).then(function (hit) {
-      const net = fetch(req).then(function (res) {
-        if (res && res.ok) { const copy = res.clone(); caches.open(CACHE_VERSION).then(function (c) { c.put(req, copy); }); }
-        return res;
-      }).catch(function () { return hit || caches.match('./index.html'); });
-      return hit || net;
+    fetch(req).then(function (res) {
+      if (res && res.ok) { const copy = res.clone(); caches.open(CACHE_VERSION).then(function (c) { c.put(req, copy); }); }
+      return res;
+    }).catch(function () {
+      return caches.match(req, { ignoreSearch: true }).then(function (hit) { return hit || caches.match('./index.html'); });
     })
   );
 });

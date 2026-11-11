@@ -59,7 +59,7 @@ function entryMsg(p, e, includeTotal) {
   let head;
   if (e.Kind === 'GOT') head = supplier ? 'Credit recorded: *' + rs(e.Amount) + '*' : (e.Mode === 'Refund' ? 'Refund credited: *' : 'Payment received: *') + rs(e.Amount) + '*' + (e.Mode && e.Mode !== 'Refund' ? ' (' + modeLabel(e.Mode) + ')' : '');
   else head = supplier ? 'Payment made: *' + rs(e.Amount) + '*' + (e.Mode ? ' (' + modeLabel(e.Mode) + ')' : '') : 'Added to your account: *' + rs(e.Amount) + '*';
-  const note = htmlToText(e.NoteHTML || '').replace(/\s*\n\s*/g, ', ').slice(0, 110);
+  const note = String(e.Summary || '').trim() || htmlToText(e.NoteHTML || '').replace(/\s*\n\s*/g, ', ').slice(0, 110);
   return waMsg(['*' + bizLabel() + '*', SEP, 'Dear ' + p.Name + ',', '', head, 'Date: ' + fmtDate(e.Date), note ? 'Details: ' + note : null,
     includeTotal ? '' : null, includeTotal ? balLine(balOf(p.PartyID)) : null, SEP].concat(customerLink(p) ? ['View your ledger:', customerLink(p)] : []));
 }
@@ -258,6 +258,7 @@ function entryForm(pid, kind, existing, prefill) {
     </div>
     ${hasMode ? `<label>${kind === 'GOT' ? 'Received as' : 'Paid by'}</label><div class="seg" id="fModes">${modes.map(x => `<button type="button" data-v="${x}" class="${x === mode ? 'on' : ''}">${x === 'UPI' ? 'UPI' : x}</button>`).join('')}</div>` : ''}
     ${dirOk ? `<label class="check" id="fCashWrap"><input type="checkbox" id="fCash" ${(isEdit ? hadCash : true) ? 'checked' : ''}> Also record in Cashbook (${cashDir(p, kind) === 'IN' ? 'cash IN' : 'cash OUT'})</label>` : ''}
+    <label>Short summary (one line, used in WhatsApp messages)<input id="fSum" maxlength="120" placeholder="e.g. Train ticket Surat - Delhi" value="${isEdit ? esc(existing.Summary || '') : ''}"></label>
     <label>Details</label>
     ${editorBlock('fEd', isEdit ? cleanHtml(existing.NoteHTML) : (prefill && prefill.html) || '')}
     <div class="attlist" id="fAtts"></div>
@@ -302,7 +303,7 @@ function entryForm(pid, kind, existing, prefill) {
     }
     const cashChk = $('#fCash', m);
     const data = {
-      EntryID: isEdit ? existing.EntryID : uid('e'), PartyID: pid, Date: date, Kind: kind, Amount: amount, NoteHTML: html,
+      EntryID: isEdit ? existing.EntryID : uid('e'), PartyID: pid, Date: date, Kind: kind, Amount: amount, NoteHTML: html, Summary: ($('#fSum', m).value || '').trim(),
       Mode: hasMode ? mode : '', Attachments: list, cashbook: !!(cashChk && cashChk.checked && mode === 'Cash')
     };
     enqueue(isEdit ? 'entry.edit' : 'entry.add', data);
