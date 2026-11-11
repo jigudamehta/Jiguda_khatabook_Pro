@@ -22,7 +22,7 @@ const initials = n => String(n || '?').trim().split(/\s+/).slice(0, 2).map(w => 
 
 /* ============================ PARTIES ============================ */
 ROUTES.parties = function (r, soft) {
-  setBar('Ravi Ledger'.replace('Ravi Ledger', setting('BusinessName') || 'RMS Ledger'), { actions: '<button class="ib" data-act="logout" title="Log out">&#9099;</button>' });
+  setBar(APP_NAME, { actions: '<button class="ib" data-act="logout" title="Log out">&#9099;</button>' });
   const type = S.tab;
   const q = fold(S.q).trim();
   const all = S.data.parties.filter(p => p.Deleted !== 'Y');
@@ -50,7 +50,8 @@ ROUTES.parties = function (r, soft) {
       <div class="av">${esc(initials(p.Name))}</div>
       <div class="mid"><div class="nm">${hi(p.Name, q)}</div>
         <div class="sub">${p.Phone ? hi(p.Phone, q) + ' · ' : ''}${ago(S.idx.lastTs.get(p.PartyID))}</div>
-        ${x.n ? `<span class="snip">${x.n} match${x.n > 1 ? 'es' : ''} in entries: ${hi(snippet(x.e.NoteText, q), q)}</span>` : ''}</div>
+        ${x.n ? `<span class="snip">${x.n} match${x.n > 1 ? 'es' : ''} in entries: ${hi(snippet(x.e.NoteText, q), q)}</span>` : ''}
+        <div class="minis"><button class="mini p1" data-act="link" data-id="${esc(p.PartyID)}" title="Share link">&#128279;</button><button class="mini p2" data-act="remind" data-id="${esc(p.PartyID)}" title="Reminder">&#128276;</button><button class="mini p3" data-act="statement" data-id="${esc(p.PartyID)}" title="Report">&#128196;</button><button class="mini p4" data-act="call" data-id="${esc(p.PartyID)}" title="Call">&#128222;</button></div></div>
       <button class="star ${p.Fav === 'Y' ? 'on' : ''}" data-act="fav" data-id="${esc(p.PartyID)}" aria-label="Favourite">&#9733;</button>
       <div class="amt">${rs(b)}<small>${lbl}</small></div></div>`;
   }).join('');
@@ -89,29 +90,29 @@ ROUTES.party = function (r) {
   let view = list.slice().reverse();
   if (q) view = view.filter(e => S.idx.hay.get(e.EntryID).includes(q));
   let lastDay = '';
-  const items = view.map(e => {
+  const items = view.map((e, ix) => {
     let head = '';
     if (e.Date !== lastDay) { lastDay = e.Date; head = `<div class="dh">${fmtDate(e.Date)}${e.Date === todayStr() ? ' · Today' : ''}</div>`; }
     const bal = withBal.get(e.EntryID);
     const al = atts(e).filter(a => !a.inline);
     const imgs = (e.NoteHTML || '').match(/<img/gi);
     const gave = e.Kind === 'GAVE';
-    return head + `<div class="entry ${q ? 'hit' : ''}" data-act="viewEntry" data-id="${esc(e.EntryID)}">
-      <div class="eleft"><div class="et">${fmtDate(e.Date)} · ${fmtTime(e.CreatedAt)}${e.Mode ? ' · ' + esc(e.Mode) : ''}${e._pending ? ' <span class="pend">• pending sync</span>' : ''}</div>
+    return head + `<div class="entry ${ix % 2 ? 'alt' : ''} ${q ? 'hit' : ''}" data-act="viewEntry" data-id="${esc(e.EntryID)}">
+      <div class="eleft"><div class="et">${fmtDate(e.Date)} · ${fmtTime(e.CreatedAt)}${e.Mode ? ' · ' + esc(modeLabel(e.Mode)) : ''}${e._pending ? ' <span class="pend">• pending sync</span>' : ''}</div>
         <span class="balbadge ${bal < -0.004 ? 'g' : ''}">Bal. ${rs(bal)}${bal > 0.004 ? ' Dr' : bal < -0.004 ? ' Cr' : ''}</span>
         <div class="note">${cleanHtml(e.NoteHTML)}</div>
         ${(al.length || imgs) ? `<div class="sub">${al.length ? '&#128206; ' + al.length + ' attachment' + (al.length > 1 ? 's' : '') : ''}${imgs ? ' &#128444;' : ''}</div>` : ''}</div>
-      <div class="ecol ${gave ? 'gave' : 'got'}">${rs(e.Amount)}</div></div>`;
+      <div class="ec gave">${gave ? rs(e.Amount) : ''}</div><div class="ec got">${gave ? '' : rs(e.Amount)}</div></div>`;
   }).join('');
   const opening = num(p.OpeningBalance);
   page(`<div class="balcard"><div><div class="sub">${b > 0.004 ? 'You will get' : b < -0.004 ? 'You will give' : 'Settled'}</div><b class="${b > 0.004 ? 'red' : 'grn'}">${rs(b)}</b></div>
       <button class="star ${p.Fav === 'Y' ? 'on' : ''}" style="font-size:26px" data-act="fav" data-id="${esc(p.PartyID)}">&#9733;</button></div>
     <div class="actions">
-      <button data-act="statement" data-id="${esc(p.PartyID)}"><span class="ai">&#128196;</span>Report</button>
-      <button data-act="remind" data-id="${esc(p.PartyID)}"><span class="ai" style="color:#25d366">&#9742;</span>Reminder</button>
-      <button data-act="reminderImg" data-id="${esc(p.PartyID)}"><span class="ai">&#128444;</span>Image</button>
-      <button data-act="link" data-id="${esc(p.PartyID)}"><span class="ai">&#128279;</span>Link</button>
-      ${p.Type === 'customer' ? `<button data-act="newBillFor" data-id="${esc(p.PartyID)}"><span class="ai">&#129534;</span>Bill</button>` : ''}
+      <button class="p3" data-act="statement" data-id="${esc(p.PartyID)}"><span class="ai">&#128196;</span>Report</button>
+      <button class="p2" data-act="remind" data-id="${esc(p.PartyID)}"><span class="ai">&#128276;</span>Reminder</button>
+      <button class="p5" data-act="reminderImg" data-id="${esc(p.PartyID)}"><span class="ai">&#128444;</span>Image</button>
+      <button class="p1" data-act="link" data-id="${esc(p.PartyID)}"><span class="ai">&#128279;</span>Link</button>
+      ${p.Type === 'customer' ? `<button class="p4" data-act="newBillFor" data-id="${esc(p.PartyID)}"><span class="ai">&#129534;</span>Bill</button>` : ''}
     </div>
     <div class="searchrow"><input id="lq" type="search" placeholder="Search inside this ledger…" value="${esc(r.q || '')}"></div>
     <div class="elhead"><span>ENTRIES</span><span class="g">YOU GAVE</span><span class="t">YOU GOT</span></div>
@@ -128,7 +129,7 @@ ACT.newBillFor = d => billForm({ PartyID: d.id });
 
 /* ============================ OUTSTANDING ============================ */
 ROUTES.outstanding = function () {
-  setBar('Outstanding', { back: true });
+  setBar('Outstanding', {});
   const o = S.out;
   let due = S.data.parties.filter(p => p.Deleted !== 'Y' && p.Type === 'customer' && balOf(p.PartyID) > Math.max(o.min, 0.004));
   if (o.fav) due = due.filter(p => p.Fav === 'Y');
@@ -182,27 +183,18 @@ ROUTES.bill = function (r) {
   const items = parseJ(b.Items, []), st = billStatus(b), due = round2(num(b.Total) - num(b.Paid));
   page(`<div class="card"><div class="row"><div class="mid"><div class="nm">${esc(p.Name)}</div><div class="sub">${fmtDate(b.Date)} · ${b.IsGst === 'Y' ? 'GST bill' : 'Non-GST bill'}${b.PartyGstin ? ' · ' + esc(b.PartyGstin) : ''}</div></div><span class="status ${st[0]}">${st[1]}</span></div></div>
     <div class="card"><table class="t"><tr><th>Item</th><th class="r">Qty</th><th class="r">Rate</th>${b.IsGst === 'Y' ? '<th class="r">GST</th>' : ''}<th class="r">Amount</th></tr>
-      ${items.map(i => `<tr><td>${esc(i.desc)}</td><td class="r">${i.qty}</td><td class="r">${NF.format(i.rate)}</td>${b.IsGst === 'Y' ? '<td class="r">' + i.gst + '%</td>' : ''}<td class="r">${NF.format(i.qty * i.rate)}</td></tr>`).join('')}</table>
+      ${items.map(i => `<tr><td>${esc(i.desc).replace(/\n/g, '<br>')}</td><td class="r">${i.qty}</td><td class="r">${NF.format(i.rate)}</td>${b.IsGst === 'Y' ? '<td class="r">' + i.gst + '%</td>' : ''}<td class="r">${NF.format(i.qty * i.rate)}</td></tr>`).join('')}</table>
       <div style="margin-top:10px;text-align:right">
         ${b.IsGst === 'Y' ? `<div>Taxable ${rs(b.Taxable)}</div><div>CGST ${rs(num(b.Tax) / 2)} · SGST ${rs(num(b.Tax) / 2)}</div>` : ''}
         <div class="b" style="font-size:18px">Total ${rs(b.Total)}</div><div>Paid ${rs(b.Paid)}</div><div class="${due > 0 ? 'red' : 'grn'} b">Due ${rs(due)}</div></div></div>
     ${b.Note ? `<div class="card sub">${esc(b.Note)}</div>` : ''}
-    <div class="btns"><button class="btn" data-act="billPrint" data-id="${esc(b.BillID)}">Print / Save PDF</button><button class="btn green" data-act="billWa" data-id="${esc(b.BillID)}">PDF link on WhatsApp</button></div>
+    <div class="btns"><button class="btn p3" data-act="billPrint" data-id="${esc(b.BillID)}">Print / Save PDF</button><button class="btn p2" data-act="billWa" data-id="${esc(b.BillID)}">PDF link on WhatsApp</button></div>
+    ${can('manager') ? `<div class="btns"><button class="btn p5" data-act="billEdit" data-id="${esc(b.BillID)}">Edit bill</button></div>` : ''}
     <div class="btns"><button class="btn out" data-act="openParty" data-id="${esc(b.PartyID)}">Open ledger</button>${can('manager') ? `<button class="btn red" data-act="billDel" data-id="${esc(b.BillID)}">Delete bill</button>` : ''}</div>
     ${b._pending ? '<div class="pend">Waiting to sync. The bill number is given by the server.</div>' : ''}`);
 };
-ACT.billPrint = d => {
-  const b = S.data.bills.find(x => x.BillID === d.id); const p = S.idx.pmap.get(b.PartyID); const items = parseJ(b.Items, []); const gst = b.IsGst === 'Y';
-  const due = round2(num(b.Total) - num(b.Paid));
-  printHtml('<html><head><meta charset="utf-8"><title>' + esc(b.BillNo) + '</title>' + PRINT_CSS + '</head><body>' +
-    bizHead('<h3 style="margin:0">' + (gst ? 'TAX INVOICE' : 'INVOICE') + ' ' + esc(b.BillNo) + '</h3><div>Date: ' + fmtDate(b.Date) + '</div>') +
-    '<div><b>Bill to:</b> ' + esc(p.Name) + (p.Phone ? ' &nbsp; ' + esc(p.Phone) : '') + (b.PartyGstin ? ' &nbsp; GSTIN: ' + esc(b.PartyGstin) : '') + '</div><br>' +
-    '<table><tr><th>#</th><th>Item</th><th class="r">Qty</th><th class="r">Rate</th>' + (gst ? '<th class="r">GST</th>' : '') + '<th class="r">Amount</th></tr>' +
-    items.map((i, n) => '<tr><td>' + (n + 1) + '</td><td>' + esc(i.desc) + '</td><td class="r">' + i.qty + '</td><td class="r">' + NF.format(i.rate) + '</td>' + (gst ? '<td class="r">' + i.gst + '%</td>' : '') + '<td class="r">' + NF.format(i.qty * i.rate) + '</td></tr>').join('') + '</table>' +
-    '<div style="text-align:right;margin-top:10px">' + (gst ? 'Taxable ' + rs(b.Taxable) + '<br>CGST ' + rs(num(b.Tax) / 2) + ' / SGST ' + rs(num(b.Tax) / 2) + '<br>' : '') +
-    '<b>Total ' + rs(b.Total) + '</b><br>Paid ' + rs(b.Paid) + '<br><b>Due ' + rs(due) + '</b></div>' + (due <= 0 ? '<h2 class="k">PAID</h2>' : '') +
-    payBlockLocal() + '<p style="color:#666">' + esc(setting('BillFooter')) + '</p></body></html>');
-};
+ACT.billPrint = d => { const b = S.data.bills.find(x => x.BillID === d.id); if (b) printHtml(billPrintHtml(b)); };
+ACT.billEdit = d => { const b = S.data.bills.find(x => x.BillID === d.id); if (!b) return; if (b._pending) return toast('Wait for the bill to sync first'); billForm({ edit: b }); };
 ACT.billWa = async d => {
   const b = S.data.bills.find(x => x.BillID === d.id); const p = S.idx.pmap.get(b.PartyID);
   if (b._pending) return toast('Wait for the bill to sync first');
@@ -211,8 +203,7 @@ ACT.billWa = async d => {
   try {
     const r = await api('billPdf', { BillID: d.id });
     await pull(); render(true);
-    const due = round2(num(b.Total) - num(b.Paid));
-    openWa(waLink(p.Phone, 'Dear ' + p.Name + ',\nYour bill ' + b.BillNo + ' dated ' + fmtDate(b.Date) + ' from ' + (setting('BusinessName') || 'us') + ':\n' + r.url + '\nTotal ' + rs(b.Total) + (due > 0 ? ', balance due ' + rs(due) : ', paid in full. Thank you!') + (customerLink(p) ? '\nYour ledger: ' + customerLink(p) : '')));
+    openWa(waLink(p.Phone, billMsg(b, p, r.url)));
   } catch (e) { toast(e.message); }
 };
 ACT.billDel = d => confirmBox('Delete this bill and its ledger entries? It goes to the recycle bin.', 'Delete', () => { enqueue('bill.delete', { BillID: d.id }); S.route = { name: 'bills' }; render(); toast('Deleted'); }, true);
@@ -231,7 +222,7 @@ const PERIODS = [['today', 'Today'], ['week', 'This week'], ['month', 'This mont
 const chipsHtml = (act, cur) => '<div class="chips">' + PERIODS.map(p => `<span class="chip ${cur === p[0] ? 'on' : ''}" data-act="${act}" data-v="${p[0]}">${p[1]}</span>`).join('') + '</div>';
 
 ROUTES.cash = function () {
-  setBar('Cashbook', {});
+  setBar('Cashbook', { back: true });
   const [from, to] = periodRange(S.cb || (S.cb = 'today'));
   const all = S.data.cash.filter(c => c.Deleted !== 'Y');
   const rows = all.filter(c => c.Date >= from && c.Date <= to).sort((a, b) => (b.Date + b.CreatedAt).localeCompare(a.Date + a.CreatedAt));
@@ -241,7 +232,7 @@ ROUTES.cash = function () {
     <div class="kpis"><div class="kpi"><small>Cash IN</small><b class="grn">${rs(inn)}</b></div><div class="kpi"><small>Cash OUT</small><b class="red">${rs(out)}</b></div>
       <div class="kpi"><small>Opening</small><b>${rs(before)}</b></div><div class="kpi"><small>Closing balance</small><b>${rs(before + inn - out)}</b></div></div>
     <div class="list">${rows.map(c => `<div class="row" ${c.LinkedEntryID ? '' : `data-act="cashOpen" data-id="${esc(c.CashID)}"`} style="cursor:${c.LinkedEntryID ? 'default' : 'pointer'}">
-      <div class="mid"><div class="nm">${esc(c.Category || (c.Kind === 'IN' ? 'Cash in' : 'Cash out'))}</div><div class="sub">${fmtDate(c.Date)} · ${esc((c.Note || '').slice(0, 60))}${c.Branch ? ' · ' + esc(c.Branch) : ''}${c._pending ? ' · pending' : ''}</div></div>
+      <div class="mid"><div class="nm">${esc(c.Category || (c.Kind === 'IN' ? 'Cash in' : 'Cash out'))}</div><div class="sub">${fmtDate(c.Date)} · ${esc((c.Note || '').slice(0, 60))}${c._pending ? ' · pending' : ''}</div></div>
       <div class="amt ${c.Kind === 'IN' ? 'grn' : 'red'}">${c.Kind === 'IN' ? '+' : '−'}${rs(c.Amount)}</div></div>`).join('') || '<div class="empty">No cash entries in this period</div>'}</div>
     <div class="bottombar"><button class="btn red" data-act="cashNew" data-k="OUT">Cash out</button><button class="btn green" data-act="cashNew" data-k="IN">Cash in</button></div>`);
 };
@@ -257,7 +248,7 @@ ACT.cashOpen = d => {
 
 /* ============================ EXPENSES ============================ */
 ROUTES.expenses = function () {
-  setBar('Expenses', {});
+  setBar('Expenses', { back: true });
   const [from, to] = periodRange(S.ex || (S.ex = 'month'));
   const rows = S.data.expenses.filter(x => x.Deleted !== 'Y' && x.Date >= from && x.Date <= to).sort((a, b) => (b.Date + b.CreatedAt).localeCompare(a.Date + a.CreatedAt));
   const total = rows.reduce((s, x) => s + num(x.Amount), 0);
@@ -319,20 +310,23 @@ ACT.expCsv = () => {
 ROUTES.more = function () {
   setBar('More', {});
   const item = (act, ic, t, s) => `<div class="row" data-act="${act}" style="cursor:pointer"><span style="font-size:22px">${ic}</span><div class="mid"><div class="nm">${t}</div><div class="sub">${s}</div></div><span class="chev">&rsaquo;</span></div>`;
-  page(`<div class="card"><div class="nm">${esc(S.user.Name)}</div><div class="sub">${esc(S.user.Role)} · ${esc(S.user.Branch)} · ${esc(S.user.Phone)}</div></div>
+  page(`<div class="card"><div class="nm">${esc(S.user.Name)}</div><div class="sub">${esc(S.user.Role)} · ${esc(S.user.Phone)}</div></div>
     <div class="list">
-      ${item('goOut', '&#128176;', 'Outstanding &amp; reminders', 'See who owes you and send WhatsApp reminders in one go')}
+      ${can('manager') ? item('goCash', '&#128181;', 'Cashbook', 'Cash in and cash out register') : ''}
+      ${can('manager') ? item('goExpenses', '&#129534;', 'Expenses', 'Shop expenses by category') : ''}
       ${can('manager') ? item('goReports', '&#128202;', 'Reports', 'Sales, cash, expenses, GST, CSV download') : ''}
       ${can('manager') ? item('goCleanup', '&#129529;', 'Clean up inactive ledgers', 'Batch delete customers with no recent activity') : ''}
       ${can('manager') ? item('goBin', '&#128465;', 'Recycle bin', 'Restore deleted ledgers, entries and bills') : ''}
       ${can('owner') ? item('goImport', '&#128229;', 'Import from Khatabook', 'Bring customers and balances as opening balances') : ''}
-      ${can('owner') ? item('goUsers', '&#128101;', 'Staff &amp; permissions', 'Add staff, set roles and branches') : ''}
-      ${can('owner') ? item('goSettings', '&#9881;', 'Business settings', 'Name, GST, UPI, bank details, bill numbering, reminder text') : ''}
+      ${can('owner') ? item('goUsers', '&#128101;', 'Staff &amp; permissions', 'Add staff and set roles') : ''}
+      ${can('owner') ? item('goSettings', '&#9881;', 'Business settings', 'Name, contact person, GST, UPI, bank, bill numbering') : ''}
+      ${item('theme', '&#127912;', 'Theme', 'Light, dark, blue or system default')}
       ${item('goSync', '&#128260;', 'Sync status', 'Pending changes and errors')}
       ${item('changePin', '&#128273;', 'Change my PIN', '')}
       ${item('logout', '&#9099;', 'Log out', '')}
-    </div><p class="muted small" style="text-align:center">RMS Ledger · attachments are saved in your Google Drive folder "RMS Ledger Attachments"</p>`);
+    </div><p class="muted small" style="text-align:center">${esc(APP_NAME)} · attachments are saved in your Google Drive folder "RMS Ledger Attachments"</p>`);
 };
+ACT.goCash = () => go('cash'); ACT.goExpenses = () => go('expenses');
 ACT.goReports = () => go('reports'); ACT.goCleanup = () => go('cleanup'); ACT.goBin = () => go('bin');
 ACT.goImport = () => go('import'); ACT.goUsers = () => go('users'); ACT.goSettings = () => go('settings');
 
@@ -414,7 +408,7 @@ ROUTES.users = async function () {
     const r = await api('users.list');
     if (S.route.name !== 'users') return;
     page(`<div class="card small muted"><b>Staff</b> can add entries and bills only. <b>Manager</b> can also edit, delete, use cashbook, expenses and reports. <b>Owner</b> can do everything, including staff, settings, import and batch delete.</div>
-      <div class="list">${r.users.map(u => `<div class="row" data-act="userEdit" data-id="${esc(u.UserID)}" style="cursor:pointer"><div class="av">${esc(initials(u.Name))}</div><div class="mid"><div class="nm">${esc(u.Name)}${u.Active !== 'Y' ? ' <span class="red small">(disabled)</span>' : ''}</div><div class="sub">${esc(u.Phone)} · ${esc(u.Role)} · ${esc(u.Branch)}</div></div><span class="chev">&rsaquo;</span></div>`).join('')}</div>
+      <div class="list">${r.users.map(u => `<div class="row" data-act="userEdit" data-id="${esc(u.UserID)}" style="cursor:pointer"><div class="av">${esc(initials(u.Name))}</div><div class="mid"><div class="nm">${esc(u.Name)}${u.Active !== 'Y' ? ' <span class="red small">(disabled)</span>' : ''}</div><div class="sub">${esc(u.Phone)} · ${esc(u.Role)}</div></div><span class="chev">&rsaquo;</span></div>`).join('')}</div>
       ${fabHtml('userNew', '+ ADD USER')}`);
     S._users = r.users;
   } catch (e) { page('<div class="empty red">' + esc(e.message) + '</div>'); }
@@ -426,12 +420,35 @@ ACT.userEdit = d => userForm((S._users || []).find(u => u.UserID === d.id), () =
 ROUTES.settings = function () {
   setBar('Business settings', { back: true });
   const f = (k, label, ph, area) => area ? `<label>${label}<textarea data-set="${k}" rows="3" placeholder="${esc(ph || '')}">${esc(setting(k))}</textarea></label>` : `<label>${label}<input data-set="${k}" value="${esc(setting(k))}" placeholder="${esc(ph || '')}"></label>`;
-  page(`<div class="card">${f('BusinessName', 'Business name')}${f('Phone', 'Mobile number', '10 digit')}${f('Address', 'Address', '', 1)}${f('GSTIN', 'GSTIN (shown on GST bills)', '24ABCDE1234F1Z5')}
+  page(`<div class="card">${f('BusinessName', 'Business name')}${f('ContactPerson', 'Contact person (shown as "Business - Contact person")', 'Jigar Mehta')}${f('Phone', 'Mobile number', '10 digit')}${f('Address', 'Address', '', 1)}${f('GSTIN', 'GSTIN (shown on GST bills)', '24ABCDE1234F1Z5')}
     ${f('UpiId', 'UPI ID (shown on PDFs and reminder image)', 'name@bank')}${f('BankDetails', 'Bank details (shown on all PDFs)', 'Bank name, A/c no, IFSC', 1)}</div>
-    <div class="card">${f('BillPrefix', 'Bill number prefix', 'INV-')}${f('Branches', 'Branch names (comma separated)', 'SVNIT,Malhar Complex')}${f('BillFooter', 'Bill footer text')}
-    ${f('AppUrl', 'Public web address of this app (used in customer links)', 'https://yourname.github.io/rms-ledger/')}</div>
-    <div class="card">${f('ReminderTemplate', 'WhatsApp reminder text', '', 1)}<div class="sub">Use {name} {amount} {business} {link} {phone}</div></div>
-    <button class="btn primary" data-act="saveSettings">Save settings</button>`);
+    <div class="card">${f('BillPrefix', 'Bill number prefix', 'INV-')}${f('BillFooter', 'Bill footer text')}
+    ${f('AppUrl', 'Public web address of this app (used in customer links)', 'https://yourname.github.io/your-app/')}<div class="sub">Must be the web address of this app (starts with https://). Not a UPI ID.</div></div>
+    <div class="card">${f('ReminderTemplate', 'WhatsApp reminder text', '', 1)}<div class="sub">Use {name} {amount} {business} {link} {phone}. Leave blank to use the standard short message.</div></div>
+    <button class="btn primary" data-act="saveSettings">Save settings</button>
+    <div class="card" style="margin-top:22px;border:1px solid var(--red)"><div class="b red">Danger zone</div><p class="small muted">CLEAR ALL permanently removes every party, entry, bill, cash and expense record, and restarts bill numbers. Staff, settings and Drive files are kept. Download a copy of the Google Sheet first.</p>
+      <button class="btn red" data-act="clearAll">CLEAR ALL data…</button></div>`);
+};
+ACT.clearAll = () => {
+  if (!can('owner')) return toast('Only the owner can do this');
+  if (!navigator.onLine) return toast('You need internet for this');
+  const m = openModal(`<div class="mh"><h3 class="red">Clear all data</h3><button class="x" data-act="closeModal">&times;</button></div>
+    <p>This deletes <b>everything</b>: all ledgers, entries, bills, cash and expenses. It cannot be undone.</p>
+    <label>Type <b>CLEAR ALL</b> to confirm<input id="caTxt" autocomplete="off" placeholder="CLEAR ALL"></label>
+    <div class="btns"><button class="btn" data-act="closeModal">Cancel</button><button class="btn red" id="caGo" disabled>Delete everything</button></div>`);
+  const t = $('#caTxt', m), g = $('#caGo', m);
+  t.oninput = () => { g.disabled = t.value !== 'CLEAR ALL'; };
+  g.onclick = async () => {
+    g.disabled = true; g.textContent = 'Clearing…';
+    try {
+      const r = await api('data.clearAll', { confirm: 'CLEAR ALL' });
+      closeModal(m);
+      S.queue = []; S.failed = []; persistQueue();
+      S.data.parties = []; S.data.entries = []; S.data.bills = []; S.data.cash = []; S.data.expenses = [];
+      S.since = ''; S.epoch = r.epoch || S.epoch; S.reminded = {}; DB.set('reminded', {}).catch(() => {});
+      await pull(); S.route = { name: 'parties' }; render(); toast('All data cleared');
+    } catch (e) { toast(e.message); g.disabled = false; g.textContent = 'Delete everything'; }
+  };
 };
 ACT.saveSettings = async () => {
   const s = {}; $$('[data-set]').forEach(el => { s[el.dataset.set] = el.value; });

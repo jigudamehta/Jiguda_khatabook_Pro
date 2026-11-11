@@ -56,6 +56,20 @@ const DB = (function () {
   };
 })();
 
+/* ---------- Theme (device preference) ---------- */
+function themePref() { try { return localStorage.getItem('rms_theme') || 'system'; } catch (e) { return 'system'; } }
+function applyTheme() {
+  const p = themePref();
+  const t = p === 'system' ? (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : p;
+  document.documentElement.setAttribute('data-theme', t);
+  const m = document.querySelector('meta[name=theme-color]');
+  if (m) m.setAttribute('content', { light: '#0b4fa8', dark: '#16263b', blue: '#0a3a8c' }[t] || '#0b4fa8');
+}
+function setThemePref(v) { try { localStorage.setItem('rms_theme', v); } catch (e) { /* ignore */ } applyTheme(); }
+try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme); } catch (e) { /* ignore */ }
+const APP_NAME = "Jiguda's Khatabook Pro";
+const modeLabel = m => (m === 'Online' ? 'UPI' : m || '');
+
 /* ---------- State ---------- */
 const S = {
   user: null, token: null,
@@ -63,7 +77,7 @@ const S = {
   since: '', queue: [], failed: [], reminded: {},
   route: { name: 'parties' }, depth: 0,
   tab: 'customer', q: '',
-  syncing: false, lastSync: '', idx: null,
+  syncing: false, lastSync: '', idx: null, epoch: '',
   cb: null, ex: null, rep: null, out: { min: 0, sel: new Set(), fav: false }, cl: { months: 12, zeroOnly: true, sel: new Set() },
   binTab: 'parties', billQ: ''
 };
@@ -74,7 +88,7 @@ const setting = k => (S.data.settings && S.data.settings[k]) || '';
 let persistT;
 function persist() {
   clearTimeout(persistT);
-  persistT = setTimeout(() => { DB.set('data', { data: S.data, since: S.since, user: S.user && S.user.UserID }).catch(() => {}); }, 300);
+  persistT = setTimeout(() => { DB.set('data', { data: S.data, since: S.since, epoch: S.epoch, user: S.user && S.user.UserID }).catch(() => {}); }, 300);
 }
 function persistQueue() { return DB.set('queue', { queue: S.queue, failed: S.failed }).catch(() => {}); }
 
@@ -133,11 +147,15 @@ function billTotals(items) {
   taxable = round2(taxable); tax = round2(tax);
   return { taxable, tax, total: round2(taxable + tax) };
 }
+const nl2br = t => esc(t).replace(/\r?\n/g, '<br>');
 function billNoteHtml(billNo, items, note) {
   let h = '<b>Bill ' + esc(billNo) + '</b>';
-  items.forEach(it => { h += '<br>' + esc(it.desc) + ' &times; ' + it.qty + ' @ ' + it.rate + (it.gst ? ' (+' + it.gst + '% GST)' : ''); });
-  if (note) h += '<br><i>' + esc(note) + '</i>';
+  items.forEach(it => { h += '<br>' + nl2br(it.desc) + (it.qty !== 1 || it.gst ? '<br><i>Qty ' + it.qty + ' &times; ' + it.rate + (it.gst ? ' (+' + it.gst + '% GST)' : '') + '</i>' : ''); });
+  if (note) h += '<br><i>' + nl2br(note) + '</i>';
   return h;
+}
+function localItems(d) {
+  return (d.Items || []).map(it => ({ desc: String(it.desc || ''), qty: num(it.qty), rate: num(it.rate), gst: d.IsGst ? num(it.gst) : 0 })).filter(it => it.desc.trim() && it.qty > 0);
 }
 function cashDir(party, kind) {
   if (party.Type === 'customer' && kind === 'GOT') return 'IN';
@@ -174,10 +192,16 @@ const balOf = pid => (S.idx && S.idx.bal.get(pid)) || 0;
 /* ---------- API ---------- */
 async function api(action, payload) {
   if (!CFG.API_URL || /PASTE_YOUR/.test(CFG.API_URL)) throw new Error('API_URL is not set in config.js');
-  const res = await fetch(CFG.API_URL, {
-    method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify(Object.assign({ action: action, token: S.token }, payload || {}))
-  });
+  let res;
+  try {
+    res = await fetch(CFG.API_URL, {
+      method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(Object.assign({ action: action, token: S.token }, payload || {}))
+    });
+  } catch (e) {
+    const er = new Error('Cannot reach the server. Check your internet. If it keeps happening, the Apps Script web app access must be set to "Anyone".');
+    er.net = true; throw er;
+  }
   let j;
   try { j = await res.json(); } catch (e) { throw new Error('Bad response from server'); }
   if (!j.ok) {
@@ -187,7 +211,7 @@ async function api(action, payload) {
   }
   return j.data;
 }
-const isNetErr = e => !e.code && /Failed to fetch|NetworkError|Load failed|network/i.test(e.message || '');
+const isNetErr = e => !!e.net || (!e.code && /Failed to fetch|NetworkError|Load failed|network/i.test(e.message || ''));
 
 /* ---------- Local (optimistic) application of queued operations ---------- */
 const KEYMAP = { party: ['parties', 'PartyID'], entry: ['entries', 'EntryID'], cash: ['cash', 'CashID'], exp: ['expenses', 'ExpenseID'], bill: ['bills', 'BillID'] };
@@ -204,10 +228,10 @@ function localRow(k, d) {
     case 'entry': return {
       EntryID: d.EntryID, PartyID: d.PartyID, Date: d.Date, Kind: d.Kind === 'GOT' ? 'GOT' : 'GAVE', Amount: round2(d.Amount),
       NoteHTML: d.NoteHTML || '', NoteText: htmlToText(d.NoteHTML || ''), Mode: d.Mode || '',
-      Attachments: JSON.stringify(Array.isArray(d.Attachments) ? d.Attachments : parseJ(d.Attachments, [])), Branch: d.Branch || S.user.Branch
+      Attachments: JSON.stringify(Array.isArray(d.Attachments) ? d.Attachments : parseJ(d.Attachments, [])), Branch: ''
     };
-    case 'cash': return { CashID: d.CashID, Date: d.Date, Kind: d.Kind === 'OUT' ? 'OUT' : 'IN', Amount: round2(d.Amount), Note: d.Note || '', Category: d.Category || '', Branch: d.Branch || S.user.Branch, LinkedEntryID: '' };
-    case 'exp': return { ExpenseID: d.ExpenseID, Date: d.Date, Category: d.Category || 'Other', Amount: round2(d.Amount), Note: d.Note || '', Mode: d.Mode || 'Cash', Branch: d.Branch || S.user.Branch };
+    case 'cash': return { CashID: d.CashID, Date: d.Date, Kind: d.Kind === 'OUT' ? 'OUT' : 'IN', Amount: round2(d.Amount), Note: d.Note || '', Category: d.Category || '', Branch: '', LinkedEntryID: '' };
+    case 'exp': return { ExpenseID: d.ExpenseID, Date: d.Date, Category: d.Category || 'Other', Amount: round2(d.Amount), Note: d.Note || '', Mode: modeLabel(d.Mode) === 'UPI' ? 'UPI' : 'Cash', Branch: '' };
   }
   return {};
 }
@@ -238,15 +262,14 @@ function localCash(entry, want) {
 }
 
 function addBillLocal(d, now) {
-  const items = (d.Items || []).map(it => ({ desc: String(it.desc || ''), qty: num(it.qty), rate: num(it.rate), gst: d.IsGst ? num(it.gst) : 0 })).filter(it => it.desc && it.qty > 0);
+  const items = localItems(d);
   const t = billTotals(items);
   const paid = Math.min(round2(d.Paid), t.total);
-  const branch = d.Branch || S.user.Branch;
   S.data.bills.push({
     BillID: d.BillID, BillNo: 'Pending', PartyID: d.PartyID, Date: d.Date, Items: JSON.stringify(items), Taxable: t.taxable, Tax: t.tax, Total: t.total, Paid: paid,
-    IsGst: d.IsGst ? 'Y' : '', PartyGstin: d.PartyGstin || '', Note: d.Note || '', Branch: branch, CreatedBy: S.user.Name, CreatedAt: now, UpdatedAt: now, PdfUrl: '', Deleted: '', _pending: true
+    IsGst: d.IsGst ? 'Y' : '', PartyGstin: d.PartyGstin || '', Note: d.Note || '', Branch: '', CreatedBy: S.user.Name, CreatedAt: now, UpdatedAt: now, PdfUrl: '', Deleted: '', _pending: true
   });
-  const base = { PartyID: d.PartyID, Date: d.Date, Branch: branch, CreatedBy: S.user.Name, CreatedAt: now, UpdatedAt: now, Deleted: '', Attachments: '[]', _pending: true };
+  const base = { PartyID: d.PartyID, Date: d.Date, Branch: '', CreatedBy: S.user.Name, CreatedAt: now, UpdatedAt: now, Deleted: '', Attachments: '[]', _pending: true };
   const gh = billNoteHtml('(pending)', items, d.Note);
   S.data.entries.push(Object.assign({}, base, { EntryID: d.BillID + '-G', Kind: 'GAVE', Amount: t.total, NoteHTML: gh, NoteText: htmlToText(gh), Mode: '' }));
   if (paid > 0) {
@@ -257,10 +280,31 @@ function addBillLocal(d, now) {
   }
 }
 
+function editBillLocal(d, now) {
+  const b = S.data.bills.find(x => x.BillID === d.BillID); if (!b) return;
+  const items = localItems(d);
+  const t = billTotals(items);
+  const paid = Math.min(round2(d.Paid), t.total);
+  Object.assign(b, { Date: d.Date, Items: JSON.stringify(items), Taxable: t.taxable, Tax: t.tax, Total: t.total, Paid: paid, IsGst: d.IsGst ? 'Y' : '', PartyGstin: d.PartyGstin || '', Note: d.Note || '', PdfUrl: '', UpdatedAt: now, _pending: true });
+  const gh = billNoteHtml(b.BillNo, items, d.Note);
+  const g = S.data.entries.find(e => e.EntryID === d.BillID + '-G');
+  if (g) Object.assign(g, { Date: d.Date, Amount: t.total, NoteHTML: gh, NoteText: htmlToText(gh), UpdatedAt: now, _pending: true });
+  const pid = d.BillID + '-P';
+  let pe = S.data.entries.find(e => e.EntryID === pid);
+  if (paid > 0) {
+    const ph = 'Payment against bill <b>' + esc(b.BillNo) + '</b>';
+    const patch = { Date: d.Date, Amount: paid, NoteHTML: ph, NoteText: htmlToText(ph), Mode: d.Mode || '', Deleted: '', DeletedAt: '', DeletedBy: '', UpdatedAt: now, _pending: true };
+    if (pe) Object.assign(pe, patch);
+    else { pe = Object.assign({ EntryID: pid, PartyID: b.PartyID, Kind: 'GOT', CreatedAt: now, CreatedBy: S.user.Name, Attachments: '[]', Branch: '' }, patch); S.data.entries.push(pe); }
+    reindex(); localCash(pe, !!d.cashbook && d.Mode === 'Cash');
+  } else if (pe && pe.Deleted !== 'Y') setDeleted('entry', pid, true, 'edit');
+}
+
 function applyLocal(op) {
   const [k, verb] = op.type.split('.');
   const d = op.data, now = iso();
   if (k === 'party' && verb === 'batchDelete') { (d.ids || []).forEach(id => setDeleted('party', id, true)); return; }
+  if (k === 'bill' && verb === 'edit') { editBillLocal(d, now); return; }
   const [key, idk] = KEYMAP[k];
   const arr = S.data[key];
   const find = id => arr.find(r => r[idk] === id);
@@ -268,14 +312,14 @@ function applyLocal(op) {
     if (k === 'bill') { addBillLocal(d, now); return; }
     const row = Object.assign({ Deleted: '', CreatedAt: now, UpdatedAt: now, CreatedBy: S.user.Name, _pending: true }, localRow(k, d));
     arr.push(row);
-    if (k === 'entry' && d.cashbook) { reindex(); localCash(row, true); }
+    if (k === 'entry' && d.cashbook && row.Mode === 'Cash') { reindex(); localCash(row, true); }
   } else if (verb === 'edit') {
     const r = find(d[idk]); if (!r) return;
     const merged = Object.assign({}, r, d);
     const nr = localRow(k, merged);
     EDITABLE[k].forEach(f => { r[f] = nr[f]; });
     r.UpdatedAt = now; r._pending = true;
-    if (k === 'entry') { reindex(); localCash(r, !!d.cashbook); }
+    if (k === 'entry') { reindex(); localCash(r, !!d.cashbook && r.Mode === 'Cash'); }
   } else if (verb === 'fav') {
     const r = find(d.PartyID); if (r) { r.Fav = d.Fav ? 'Y' : ''; r.UpdatedAt = now; r._pending = true; }
   } else if (verb === 'delete') setDeleted(k, d[idk], true);
@@ -332,7 +376,9 @@ async function syncNow(manual) {
 }
 
 async function pull() {
-  const r = await api('pull', { since: S.since });
+  let r = await api('pull', { since: S.since });
+  if (S.since && S.epoch && r.epoch && r.epoch !== S.epoch) { S.since = ''; r = await api('pull', { since: '' }); }
+  if (r.epoch) S.epoch = r.epoch;
   const D = S.data;
   const full = !S.since;
   const sets = [['parties', 'PartyID'], ['entries', 'EntryID'], ['cash', 'CashID'], ['expenses', 'ExpenseID'], ['bills', 'BillID']];
@@ -373,13 +419,12 @@ function setBar(title, opts) {
 }
 
 const NAV = [
-  { r: 'parties', l: 'Parties', i: '👥', min: 'staff' },
-  { r: 'bills', l: 'Bills', i: '🧾', min: 'staff' },
-  { r: 'cash', l: 'Cashbook', i: '💵', min: 'manager' },
-  { r: 'expenses', l: 'Expenses', i: '📉', min: 'manager' },
-  { r: 'more', l: 'More', i: '…', min: 'staff' }
+  { r: 'parties', l: 'Parties', i: '\uD83D\uDC65', min: 'staff' },
+  { r: 'bills', l: 'Bills', i: '\uD83E\uDDFE', min: 'staff' },
+  { r: 'outstanding', l: 'Outstanding', i: '\uD83D\uDCB0', min: 'staff' },
+  { r: 'more', l: 'More', i: '\u2026', min: 'staff' }
 ];
-const NAV_GROUP = { party: 'parties', bill: 'bills', outstanding: 'more', reports: 'more', cleanup: 'more', bin: 'more', users: 'more', settings: 'more', import: 'more', sync: 'more' };
+const NAV_GROUP = { party: 'parties', bill: 'bills', cash: 'more', expenses: 'more', reports: 'more', cleanup: 'more', bin: 'more', users: 'more', settings: 'more', import: 'more', sync: 'more', theme: 'more' };
 function renderNav() {
   $('#nav').innerHTML = NAV.filter(n => can(n.min)).map(n => `<button data-act="nav" data-r="${n.r}" id="nav-${n.r}"><span class="ni">${n.i}</span>${n.l}</button>`).join('');
 }
@@ -507,6 +552,7 @@ document.addEventListener('click', e => {
 
 /* ---------- Start ---------- */
 async function init() {
+  applyTheme();
   if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
   const qs = new URLSearchParams(location.search);
   if (qs.get('c')) { openCustomerView(qs.get('c')); return; }
@@ -518,7 +564,7 @@ async function init() {
     S.reminded = (await DB.get('reminded')) || {};
     if (sess && sess.token) {
       S.user = sess.user; S.token = sess.token;
-      if (dat && dat.data) { S.data = Object.assign(S.data, dat.data); S.since = dat.since || ''; }
+      if (dat && dat.data) { S.data = Object.assign(S.data, dat.data); S.since = dat.since || ''; S.epoch = dat.epoch || ''; }
       if (q) { S.queue = q.queue || []; S.failed = q.failed || []; }
       ['parties', 'entries', 'cash', 'expenses', 'bills'].forEach(k => { if (!Array.isArray(S.data[k])) S.data[k] = []; });
       reindex(); showApp(); syncNow();

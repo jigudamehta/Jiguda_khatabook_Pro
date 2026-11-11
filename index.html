@@ -3,9 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <title>RMS Ledger</title>
+  <title>Jiguda's Khatabook Pro</title>
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#0b4fa8">
+  <meta name="apple-mobile-web-app-title" content="Khatabook Pro">
+  <script>(function(){try{var t=localStorage.getItem("rms_theme")||"system";var d=t==="system"?(window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):t;document.documentElement.setAttribute("data-theme",d);}catch(e){document.documentElement.setAttribute("data-theme","light");}})();</script>
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="stylesheet" href="styles.css">
@@ -18,7 +20,7 @@
 <div id="login" hidden>
   <form id="loginForm" class="login-card" autocomplete="on">
     <img src="icon-192.png" alt="" width="72" height="72" class="logo">
-    <h1>RMS Ledger</h1>
+    <h1>Jiguda's Khatabook Pro</h1>
     <p class="muted" id="loginMsg">Log in with your phone number and PIN</p>
     <label>Phone number
       <input id="lPhone" type="tel" inputmode="numeric" maxlength="12" autocomplete="username" placeholder="10 digit mobile number" required>

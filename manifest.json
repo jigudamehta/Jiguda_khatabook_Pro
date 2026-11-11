@@ -1,7 +1,7 @@
 {
-  "name": "RMS Ledger",
-  "short_name": "RMS Ledger",
-  "description": "Khatabook-style ledger, bills, cashbook and reminders for Ravi Mobile",
+  "name": "Jiguda's Khatabook Pro",
+  "short_name": "Khatabook Pro",
+  "description": "Ledger, bills, cashbook and WhatsApp reminders",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

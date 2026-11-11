@@ -1,6 +1,6 @@
 // Service worker: caches the app files so the app opens offline.
 // IMPORTANT: when you edit any app file, change CACHE_VERSION so phones pick up the new files.
-const CACHE_VERSION = 'rms-ledger-v1';
+const CACHE_VERSION = 'rms-ledger-v2';
 const SHELL = [
   './', './index.html', './styles.css', './config.js', './core.js', './forms.js', './pages.js', './customer.js',
   './manifest.json', './icon.svg', './icon-192.png', './icon-512.png'
