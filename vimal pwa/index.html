@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Jiguda's Khatabook Pro</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0b4fa8">
+  <meta name="apple-mobile-web-app-title" content="Khatabook Pro">
+  <script>(function(){try{var t=localStorage.getItem("rms_theme")||"system";var d=t==="system"?(window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):t;document.documentElement.setAttribute("data-theme",d);}catch(e){document.documentElement.setAttribute("data-theme","light");}})();</script>
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div id="boot"><div class="spin"></div><div>Loading…</div></div>
+
+<!-- Login -->
+<div id="login" hidden>
+  <form id="loginForm" class="login-card" autocomplete="on">
+    <img src="icon-192.png" alt="" width="72" height="72" class="logo">
+    <h1>Jiguda's Khatabook Pro</h1>
+    <p class="muted" id="loginMsg">Log in with your phone number and PIN</p>
+    <label>Phone number
+      <input id="lPhone" type="tel" inputmode="numeric" maxlength="12" autocomplete="username" placeholder="10 digit mobile number" required>
+    </label>
+    <label>PIN
+      <input id="lPin" type="password" inputmode="numeric" maxlength="8" autocomplete="current-password" placeholder="4 to 8 digits" required>
+    </label>
+    <button class="btn primary" type="submit" id="lBtn">Log in</button>
+    <p class="muted small" id="lErr" style="color:#c62828"></p>
+  </form>
+</div>
+
+<!-- App shell -->
+<div id="app" hidden>
+  <header id="bar">
+    <button id="backBtn" class="ib" data-act="back" hidden aria-label="Back">&#8592;</button>
+    <div id="title">Ledger</div>
+    <div id="barActions"></div>
+    <button id="pill" class="pill" data-act="goSync" aria-label="Sync status"></button>
+  </header>
+  <main id="page"></main>
+  <nav id="nav"></nav>
+</div>
+
+<!-- Customer view (opened from a personal link) -->
+<div id="customer" hidden></div>
+
+<div id="modals"></div>
+<div id="toast" hidden></div>
+
+<script src="config.js"></script>
+<script src="core.js"></script>
+<script src="forms.js"></script>
+<script src="pages.js"></script>
+<script src="customer.js"></script>
+<script>window.addEventListener('DOMContentLoaded', init);</script>
+</body>
+</html>
