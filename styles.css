@@ -200,3 +200,5 @@ table.t td.r,table.t th.r{text-align:right}
 #customer .cbody{padding:0 12px 30px}
 
 @media print{ #bar,#nav,.fab,.bottombar,#toast{display:none!important} #page{padding:0} }
+.sp .elhead .g,.sp .elhead .t,.sp .entry .ec{width:66px;font-size:12px;padding:0 2px}
+.sp .entry .ec.gave,.sp .entry .ec.got{font-size:13px}

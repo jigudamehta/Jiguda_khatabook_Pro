@@ -216,18 +216,19 @@ const isNetErr = e => !!e.net || (!e.code && /Failed to fetch|NetworkError|Load 
 /* ---------- Local (optimistic) application of queued operations ---------- */
 const KEYMAP = { party: ['parties', 'PartyID'], entry: ['entries', 'EntryID'], cash: ['cash', 'CashID'], exp: ['expenses', 'ExpenseID'], bill: ['bills', 'BillID'] };
 const EDITABLE = {
-  party: ['Name', 'Phone', 'Notes', 'OpeningBalance'],
-  entry: ['Date', 'Kind', 'Amount', 'NoteHTML', 'NoteText', 'Mode', 'Attachments', 'Summary'],
+  party: ['Name', 'Phone', 'Notes', 'OpeningBalance', 'HideAgent'],
+  entry: ['Date', 'Kind', 'Amount', 'NoteHTML', 'NoteText', 'Mode', 'Attachments', 'Summary', 'TicketAmt', 'AgentChg'],
   cash: ['Date', 'Kind', 'Amount', 'Note', 'Category'],
   exp: ['Date', 'Category', 'Amount', 'Note', 'Mode']
 };
 
 function localRow(k, d) {
   switch (k) {
-    case 'party': return { PartyID: d.PartyID, Type: d.Type === 'supplier' ? 'supplier' : 'customer', Name: String(d.Name || '').trim(), Phone: normPhone(d.Phone), Fav: '', Code: '', OpeningBalance: round2(d.OpeningBalance), Notes: d.Notes || '' };
+    case 'party': return { PartyID: d.PartyID, Type: d.Type === 'supplier' ? 'supplier' : 'customer', Name: String(d.Name || '').trim(), Phone: normPhone(d.Phone), Fav: '', Code: '', OpeningBalance: round2(d.OpeningBalance), Notes: d.Notes || '', HideAgent: d.HideAgent ? 'Y' : '' };
     case 'entry': return {
       EntryID: d.EntryID, PartyID: d.PartyID, Date: d.Date, Kind: d.Kind === 'GOT' ? 'GOT' : 'GAVE', Amount: round2(d.Amount),
       NoteHTML: d.NoteHTML || '', NoteText: htmlToText(d.NoteHTML || ''), Mode: d.Mode || '', Summary: String(d.Summary || '').replace(/\s+/g, ' ').trim().slice(0, 120),
+      TicketAmt: d.TicketAmt === undefined || d.TicketAmt === '' ? '' : String(d.TicketAmt), AgentChg: d.AgentChg === undefined || d.AgentChg === '' ? '' : String(d.AgentChg),
       Attachments: JSON.stringify(Array.isArray(d.Attachments) ? d.Attachments : parseJ(d.Attachments, [])), Branch: ''
     };
     case 'cash': return { CashID: d.CashID, Date: d.Date, Kind: d.Kind === 'OUT' ? 'OUT' : 'IN', Amount: round2(d.Amount), Note: d.Note || '', Category: d.Category || '', Branch: '', LinkedEntryID: '' };

@@ -33,14 +33,14 @@ async function openCustomerView(code) {
       <div class="cbal"><div class="sub">${esc(line)}</div>
         <b style="font-size:30px;color:${settled ? 'var(--green)' : youOwe ? 'var(--red)' : 'var(--green)'}">${rs(Math.abs(bal))}</b>
         ${youOwe && biz.upi ? '<div class="sub" style="margin-top:6px">Pay by UPI: <b>' + esc(biz.upi) + '</b></div>' : ''}</div>
-      <div class="cbody">
+      <div class="cbody ${data.split ? "sp" : ""}">
         <div class="card"><div class="grid2"><label>From<input type="date" id="cvFrom" value="${esc(st.from)}"></label><label>To<input type="date" id="cvTo" value="${esc(st.to)}"></label></div>
           <div class="chips"><span class="chip ${st.kind === 'all' ? 'on' : ''}" data-k="all">All</span><span class="chip ${st.kind === 'GAVE' ? 'on' : ''}" data-k="GAVE">${cols[0]}</span><span class="chip ${st.kind === 'GOT' ? 'on' : ''}" data-k="GOT">${cols[1]}</span></div>
           <input id="cvQ" type="search" placeholder="Search entries…" value="${esc(st.q)}"></div>
         <div class="sub" style="margin:6px 4px">${rows.length} entr${rows.length === 1 ? 'y' : 'ies'}</div>
-        <div class="elhead"><span>ENTRIES</span><span class="g">${cols[0].toUpperCase()}</span><span class="t">${cols[1].toUpperCase()}</span></div>
+        <div class="elhead"><span>ENTRIES</span>${data.split ? '<span class="g" style="color:var(--muted)">TICKET</span><span class="t" style="color:var(--muted)">AGENT</span>' : ''}<span class="g">${cols[0].toUpperCase()}</span><span class="t">${cols[1].toUpperCase()}</span></div>
         ${rows.map((e, i) => `<div class="entry ${i % 2 ? 'alt' : ''}" style="cursor:default"><div class="eleft"><div class="et">${fmtDate(e.Date)}${e.Mode ? ' · ' + esc(modeLabel(e.Mode)) : ''}</div><span class="balbadge ${e.Balance < -0.004 ? 'g' : ''}">Balance ${rs(Math.abs(e.Balance))}</span><div class="note full" style="max-height:none">${esc(e.Text).replace(/\n/g, '<br>')}</div></div>
-          <div class="ec gave">${e.Kind === 'GAVE' ? rs(e.Amount) : ''}</div><div class="ec got">${e.Kind === 'GOT' ? rs(e.Amount) : ''}</div></div>`).join('') || '<div class="empty">No entries</div>'}
+          ${data.split ? `<div class="ec">${e.Ticket != null ? rs(e.Ticket) : ''}</div><div class="ec">${e.Agent != null ? rs(e.Agent) : ''}</div>` : ''}<div class="ec gave">${e.Kind === 'GAVE' ? rs(e.Amount) : ''}</div><div class="ec got">${e.Kind === 'GOT' ? rs(e.Amount) : ''}</div></div>`).join('') || '<div class="empty">No entries</div>'}
         <p class="muted small" style="text-align:center;margin-top:20px">View only. For any query please contact ${esc(label)}${biz.phone ? ' on ' + esc(biz.phone) : ''}.</p></div>`;
     $('#cvFrom').onchange = e => { st.from = e.target.value; draw(); };
     $('#cvTo').onchange = e => { st.to = e.target.value; draw(); };

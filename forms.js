@@ -217,6 +217,7 @@ function partyForm(type, existing) {
       <label>Opening balance is<select id="pObType"><option value="get" ${ob >= 0 ? 'selected' : ''}>You will get</option><option value="give" ${ob < 0 ? 'selected' : ''}>You will give</option></select></label>
     </div>
     <label>Notes (optional)<input id="pNotes" value="${esc(isEdit ? existing.Notes : '')}"></label>
+    <label class="check"><input type="checkbox" id="pHide" ${isEdit && existing.HideAgent === 'Y' ? 'checked' : ''}> Hide ticket / agent breakdown from this party (PDFs and link)</label>
     <button class="btn primary" id="pSave" style="margin-top:12px">Save</button>`);
   const dupOf = () => { const ph = normPhone($('#pPhone', m).value); return ph.length === 10 ? S.data.parties.find(p => p.Deleted !== 'Y' && p.Phone === ph && (!isEdit || p.PartyID !== existing.PartyID)) : null; };
   $('#pPhone', m).oninput = () => { const d = dupOf(); $('#pWarn', m).innerHTML = d ? `<div class="warnbox">This mobile number is already saved for <b>${esc(d.Name)}</b>.</div>` : ''; };
@@ -229,8 +230,8 @@ function partyForm(type, existing) {
     const ob2 = $('#pObType', m).value === 'give' ? -amt : amt;
     const dup = dupOf();
     const go2 = () => {
-      if (isEdit) enqueue('party.edit', { PartyID: existing.PartyID, Name: name, Phone: phone, Notes: $('#pNotes', m).value, OpeningBalance: ob2 });
-      else enqueue('party.add', { PartyID: uid('p'), Type: t, Name: name, Phone: phone, Notes: $('#pNotes', m).value, OpeningBalance: ob2 });
+      if (isEdit) enqueue('party.edit', { PartyID: existing.PartyID, Name: name, Phone: phone, Notes: $('#pNotes', m).value, OpeningBalance: ob2, HideAgent: $('#pHide', m).checked ? 'Y' : '' });
+      else enqueue('party.add', { PartyID: uid('p'), Type: t, Name: name, Phone: phone, Notes: $('#pNotes', m).value, OpeningBalance: ob2, HideAgent: $('#pHide', m).checked ? 'Y' : '' });
       closeModal(m); toast('Saved');
     };
     if (dup) confirmBox('"' + dup.Name + '" already has this mobile number. Save anyway?', 'Save', go2); else go2();
@@ -261,6 +262,9 @@ function entryForm(pid, kind, existing, prefill) {
     <label>Short summary (one line, used in WhatsApp messages)<input id="fSum" maxlength="120" placeholder="e.g. Train ticket Surat - Delhi" value="${isEdit ? esc(existing.Summary || '') : ''}"></label>
     <label>Details</label>
     ${editorBlock('fEd', isEdit ? cleanHtml(existing.NoteHTML) : (prefill && prefill.html) || '')}
+    <div class="grid2"><label>Ticket amount (₹)<input id="fTkt" type="number" inputmode="decimal" min="0" step="0.01" placeholder="optional" value="${isEdit && existing.TicketAmt !== '' && existing.TicketAmt != null ? esc(existing.TicketAmt) : ''}"></label>
+      <label>Agent charges (₹)<input id="fAgt" type="number" inputmode="decimal" min="0" step="0.01" placeholder="optional" value="${isEdit && existing.AgentChg !== '' && existing.AgentChg != null ? esc(existing.AgentChg) : ''}"></label></div>
+    <div class="sub" id="fSplitNote" style="margin:2px 0 6px">Fill both to calculate the Amount automatically. Shown in reports only, not in WhatsApp messages.</div>
     <div class="attlist" id="fAtts"></div>
     <button type="button" class="btn sm p4" id="fAttach">&#128206; Attach PDF / photo</button>
     <input type="file" id="fFile" hidden multiple accept="image/*,application/pdf">
@@ -269,6 +273,12 @@ function entryForm(pid, kind, existing, prefill) {
     ${!isEdit && isGave && p.Type === 'customer' ? `<label class="check"><input type="checkbox" id="fBill"> Create a bill for this entry (GST / non-GST)</label>` : ''}
     <button class="btn primary" id="fSave" style="margin-top:10px">Save</button>`);
   const ed = $('#fEd', m); bindEditor(m, ed);
+  const calcSplit = () => {
+    const t = $('#fTkt', m).value, a = $('#fAgt', m).value;
+    if (t === '' && a === '') return;
+    $('#fAmt', m).value = round2(num(t) + num(a)) || '';
+  };
+  $('#fTkt', m).oninput = calcSplit; $('#fAgt', m).oninput = calcSplit;
   const syncCashBox = () => { const w = $('#fCashWrap', m); if (w) { w.hidden = mode !== 'Cash'; } };
   syncCashBox();
   $$('#fModes button', m).forEach(b => b.onclick = () => { mode = b.dataset.v; $$('#fModes button', m).forEach(x => x.classList.toggle('on', x === b)); const c = $('#fCash', m); if (c && !isEdit) c.checked = mode === 'Cash'; syncCashBox(); });
@@ -292,7 +302,10 @@ function entryForm(pid, kind, existing, prefill) {
   const nt = $('#fNotify', m);
   if (nt) nt.onchange = () => { $('#fTotWrap', m).hidden = !nt.checked; };
   $('#fSave', m).onclick = () => {
-    const amount = round2($('#fAmt', m).value);
+    const tk = $('#fTkt', m).value.trim(), ag = $('#fAgt', m).value.trim();
+    if ((tk === '') !== (ag === '')) return toast('Fill both Ticket amount and Agent charges (0 is allowed)');
+    if (tk !== '' && (num(tk) < 0 || num(ag) < 0)) return toast('Ticket amount and agent charges cannot be negative');
+    const amount = tk !== '' ? round2(num(tk) + num(ag)) : round2($('#fAmt', m).value);
     if (!(amount > 0)) return toast('Enter the amount');
     const date = $('#fDate', m).value || todayStr();
     const html = editorValue(ed);
@@ -303,7 +316,7 @@ function entryForm(pid, kind, existing, prefill) {
     }
     const cashChk = $('#fCash', m);
     const data = {
-      EntryID: isEdit ? existing.EntryID : uid('e'), PartyID: pid, Date: date, Kind: kind, Amount: amount, NoteHTML: html, Summary: ($('#fSum', m).value || '').trim(),
+      EntryID: isEdit ? existing.EntryID : uid('e'), PartyID: pid, Date: date, Kind: kind, Amount: amount, NoteHTML: html, Summary: ($('#fSum', m).value || '').trim(), TicketAmt: tk, AgentChg: ag,
       Mode: hasMode ? mode : '', Attachments: list, cashbook: !!(cashChk && cashChk.checked && mode === 'Cash')
     };
     enqueue(isEdit ? 'entry.edit' : 'entry.add', data);
@@ -321,6 +334,7 @@ function viewEntry(id) {
   const m = openModal(`<div class="mh"><h3 class="${e.Kind === 'GAVE' ? 'red' : 'grn'}">${e.Kind === 'GAVE' ? 'You gave' : 'You got'} ${rs(e.Amount)}</h3><button class="x" data-act="closeModal">&times;</button></div>
     <div class="sub">${esc(p ? p.Name : '')} · ${fmtDate(e.Date)} · added ${fmtDate((e.CreatedAt || '').slice(0, 10))} ${fmtTime(e.CreatedAt)} by ${esc(e.CreatedBy || '')}${e.Mode ? ' · ' + esc(modeLabel(e.Mode)) : ''}</div>
     ${e._pending ? '<div class="pend">Waiting to sync…</div>' : ''}
+    ${hasSplit(e) ? `<div class="sub"><b>Ticket</b> ${rs(e.TicketAmt)} + <b>Agent charges</b> ${rs(e.AgentChg)}</div>` : ''}
     <div class="rtv" style="margin:10px 0;word-break:break-word">${cleanHtml(e.NoteHTML) || '<span class="muted">No details</span>'}</div>
     <div class="atts">${al.map(a => (a.mime || '').indexOf('image/') === 0 ? `<img class="th" src="${esc(a.dataUrl || a.url)}" alt="">` : `<a class="attchip" target="_blank" rel="noopener" href="${esc(a.url || '#')}">&#128196; ${esc(a.name || 'file')}</a>`).join('')}</div>
     <div class="btns">
@@ -651,22 +665,25 @@ function computeStatement(p, mode, from, to) {
   }
   return { opening: opening, rows: rows, closing: rows.length ? rows[rows.length - 1].bal : opening, label: label };
 }
+function hasSplit(e) { return e.TicketAmt !== '' && e.TicketAmt != null; }
 function statementHtml(p, mode, from, to) {
   const s = computeStatement(p, mode, from, to);
   const bc = b => `<span class="${b > 0.004 ? 'red' : 'grn'}">${NF.format(Math.abs(b))}${b > 0.004 ? ' Due' : b < -0.004 ? ' Cr' : ''}</span>`;
-  let gv = 0, gt = 0;
+  let gv = 0, gt = 0, tt = 0, ta = 0;
+  const hasSp = p.HideAgent !== 'Y' && s.rows.some(x => hasSplit(x.e)), nsp = hasSp ? 2 : 0;
   const body = s.rows.map((x, i) => {
     const a = num(x.e.Amount); if (x.e.Kind === 'GAVE') gv += a; else gt += a;
-    return `<tr class="${i % 2 ? '' : 'z'}"><td>${fmtDate(x.e.Date)}</td><td>${esc((x.e.NoteText || '').slice(0, 300)).replace(/\n/g, '<br>')}${x.e.Mode ? ' <span class="sub">(' + esc(modeLabel(x.e.Mode)) + ')</span>' : ''}</td><td class="r red">${x.e.Kind === 'GAVE' ? NF.format(a) : ''}</td><td class="r grn">${x.e.Kind === 'GOT' ? NF.format(a) : ''}</td><td class="r">${bc(x.bal)}</td></tr>`;
+    const hs = hasSplit(x.e); if (hs) { tt += num(x.e.TicketAmt); ta += num(x.e.AgentChg); }
+    return `<tr class="${i % 2 ? '' : 'z'}"><td>${fmtDate(x.e.Date)}</td><td>${esc((x.e.NoteText || '').slice(0, 300)).replace(/\n/g, '<br>')}${x.e.Mode ? ' <span class="sub">(' + esc(modeLabel(x.e.Mode)) + ')</span>' : ''}</td>${hasSp ? `<td class="r">${hs ? NF.format(num(x.e.TicketAmt)) : ''}</td><td class="r">${hs ? NF.format(num(x.e.AgentChg)) : ''}</td>` : ''}<td class="r red">${x.e.Kind === 'GAVE' ? NF.format(a) : ''}</td><td class="r grn">${x.e.Kind === 'GOT' ? NF.format(a) : ''}</td><td class="r">${bc(x.bal)}</td></tr>`;
   }).join('');
   const pv = perspective(s.closing);
   return '<html><head><meta charset="utf-8"><title>Statement</title>' + PRINT_CSS + '</head><body>' +
     docHead('<div style="font-size:20px;font-weight:bold">Account Statement</div><div>' + esc(s.label) + '</div><div>Generated: ' + fmtDate(todayStr()) + '</div>') +
     '<table class="bx"><tr><td style="padding:12px"><div class="sub">Statement for</div><div style="font-size:16px;font-weight:bold">' + esc(p.Name) + '</div>' + (p.Phone ? '<div><b>Phone: ' + esc(p.Phone) + '</b></div>' : '') + '</td>' +
     '<td class="r" style="padding:12px"><div>Closing balance</div><div style="font-size:24px;font-weight:bold" class="' + pv.cls + '">' + rs(s.closing) + '</div></td></tr></table><br>' +
-    '<table class="items"><tr><th>Date</th><th>Details</th><th class="r red">To pay</th><th class="r grn">Paid</th><th class="r">Balance</th></tr>' +
-    '<tr style="background:#f6f8fc"><td colspan="4"><i>Opening balance</i></td><td class="r">' + bc(s.opening) + '</td></tr>' + body +
-    '<tr style="background:#dfe8f7"><td colspan="2"><b>Totals</b></td><td class="r red"><b>' + NF.format(gv) + '</b></td><td class="r grn"><b>' + NF.format(gt) + '</b></td><td></td></tr></table><br>' +
+    '<table class="items"><tr><th>Date</th><th>Details</th>' + (hasSp ? '<th class="r">Ticket</th><th class="r">Agent</th>' : '') + '<th class="r red">To pay</th><th class="r grn">Paid</th><th class="r">Balance</th></tr>' +
+    '<tr style="background:#f6f8fc"><td colspan="' + (4 + nsp) + '"><i>Opening balance</i></td><td class="r">' + bc(s.opening) + '</td></tr>' + body +
+    '<tr style="background:#dfe8f7"><td colspan="2"><b>Totals</b></td>' + (hasSp ? '<td class="r"><b>' + NF.format(tt) + '</b></td><td class="r"><b>' + NF.format(ta) + '</b></td>' : '') + '<td class="r red"><b>' + NF.format(gv) + '</b></td><td class="r grn"><b>' + NF.format(gt) + '</b></td><td></td></tr></table><br>' +
     '<div style="font-size:16px;font-weight:bold" class="' + pv.cls + '">' + esc(pv.t) + '</div>' + docFoot('THIS IS A COMPUTER GENERATED STATEMENT', false) + '</body></html>';
 }
 function statementModal(pid) {

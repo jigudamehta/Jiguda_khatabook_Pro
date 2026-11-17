@@ -285,6 +285,10 @@ ROUTES.reports = function () {
   const got = ents.filter(e => e.Kind === 'GOT' && S.idx.pmap.get(e.PartyID).Type === 'customer').reduce((s, e) => s + num(e.Amount), 0);
   let get = 0, give = 0; S.data.parties.forEach(p => { if (p.Deleted === 'Y') return; const b = balOf(p.PartyID); if (b > 0) get += b; else give -= b; });
   const top = S.data.parties.filter(p => p.Deleted !== 'Y' && p.Type === 'customer' && balOf(p.PartyID) > 0.004).sort((a, b) => balOf(b.PartyID) - balOf(a.PartyID)).slice(0, 10);
+  const sp = ents.filter(hasSplit);
+  const spT = sp.reduce((s, e) => s + num(e.TicketAmt), 0), spA = sp.reduce((s, e) => s + num(e.AgentChg), 0);
+  const byAg = new Map(); sp.forEach(e => { const r = byAg.get(e.PartyID) || { t: 0, a: 0, n: 0 }; r.t += num(e.TicketAmt); r.a += num(e.AgentChg); r.n++; byAg.set(e.PartyID, r); });
+  const agList = Array.from(byAg.entries()).sort((x, y) => y[1].a - x[1].a).slice(0, 15);
   page(`${chipsHtml('repP', per)}
     <div class="kpis"><div class="kpi"><small>Bills (sales)</small><b>${rs(sales)}</b></div><div class="kpi"><small>GST collected</small><b>${rs(tax)}</b></div>
       <div class="kpi"><small>Credit given (customers)</small><b class="red">${rs(gave)}</b></div><div class="kpi"><small>Received from customers</small><b class="grn">${rs(got)}</b></div>
@@ -292,6 +296,9 @@ ROUTES.reports = function () {
       <div class="kpi"><small>Expenses</small><b class="red">${rs(exp)}</b></div><div class="kpi"><small>Sales − expenses</small><b>${rs(sales - exp)}</b></div></div>
     <div class="card"><div class="row"><span class="mid">Total you will get (all parties)</span><b class="red">${rs(get)}</b></div><div class="row"><span class="mid">Total you will give</span><b class="grn">${rs(give)}</b></div></div>
     <div class="card"><div class="sub">Top 10 outstanding</div>${top.map(p => `<div class="row" data-act="openParty" data-id="${esc(p.PartyID)}" style="cursor:pointer"><span class="mid">${esc(p.Name)}</span><b class="red">${rs(balOf(p.PartyID))}</b></div>`).join('') || '<div class="muted">None</div>'}</div>
+    <div class="card"><div class="sub">Ticket &amp; agent charges (${sp.length} entr${sp.length === 1 ? 'y' : 'ies'} with a split)</div>
+      <div class="row"><span class="mid">Ticket amount</span><b>${rs(spT)}</b></div><div class="row"><span class="mid">Agent charges earned</span><b class="grn">${rs(spA)}</b></div>
+      ${agList.map(([pid, r]) => `<div class="row" data-act="openParty" data-id="${esc(pid)}" style="cursor:pointer"><span class="mid">${esc(S.idx.pmap.get(pid).Name)}<div class="sub">${r.n} · ticket ${rs(r.t)}</div></span><b>${rs(r.a)}</b></div>`).join('')}</div>
     <div class="btns"><button class="btn" data-act="expCsv">Download entries (CSV)</button><button class="btn out" data-act="goOut">Outstanding list</button></div>
     <p class="muted small">Per-customer statements: open a customer ledger and tap <b>Report</b> (since last zero balance, this month, custom dates, or all).</p>`);
 };
@@ -300,9 +307,9 @@ ACT.goOut = () => go('outstanding');
 ACT.expCsv = () => {
   const [from, to] = periodRange(S.rep || 'month');
   const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
-  const rows = [['Date', 'Party', 'Type', 'You gave', 'You got', 'Mode', 'Details']];
+  const rows = [['Date', 'Party', 'Type', 'You gave', 'You got', 'Ticket amount', 'Agent charges', 'Mode', 'Details']];
   S.data.entries.filter(e => e.Deleted !== 'Y' && e.Date >= from && e.Date <= to && S.idx.pmap.get(e.PartyID)).sort((a, b) => a.Date.localeCompare(b.Date))
-    .forEach(e => rows.push([e.Date, S.idx.pmap.get(e.PartyID).Name, S.idx.pmap.get(e.PartyID).Type, e.Kind === 'GAVE' ? e.Amount : '', e.Kind === 'GOT' ? e.Amount : '', e.Mode, e.NoteText]));
+    .forEach(e => rows.push([e.Date, S.idx.pmap.get(e.PartyID).Name, S.idx.pmap.get(e.PartyID).Type, e.Kind === 'GAVE' ? e.Amount : '', e.Kind === 'GOT' ? e.Amount : '', hasSplit(e) ? e.TicketAmt : '', hasSplit(e) ? e.AgentChg : '', e.Mode, e.NoteText]));
   downloadBlob(new Blob(['﻿' + rows.map(r => r.map(q).join(',')).join('\r\n')], { type: 'text/csv' }), 'ledger-entries.csv');
 };
 
